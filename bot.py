@@ -1,3 +1,18 @@
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+def fake_server():
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"Bot running")
+
+    server = HTTPServer(("", 10000), Handler)  # Render otomatik PORT veriyor
+    server.serve_forever()
+
+threading.Thread(target=fake_server, daemon=True).start()
+
 import requests
 import time
 import feedparser
