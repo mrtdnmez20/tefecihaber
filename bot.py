@@ -8,11 +8,14 @@ import re
 from datetime import datetime, timezone, timedelta
 
 # -----------------------------
-# Telegram bilgileri
-TELEGRAM_BOT_TOKEN = "8184765049:AAGS-X9Qa829_kV7hiWFistjN3G3QdJs1SY"  # buraya kendi tokenını yaz
-CHAT_ID = 5250165372               # buraya kendi chat_id yaz
+# Telegram bilgileri environment variable üzerinden alınır
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 KEYWORDS = ["tefeci", "tefecilik", "pos tefe"]
 # -----------------------------
+
+if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
+    raise ValueError("Lütfen TELEGRAM_BOT_TOKEN ve CHAT_ID environment variable olarak tanımlayın!")
 
 # Fake server Render için
 def fake_server():
@@ -47,17 +50,14 @@ def save_links():
 
 # Resim çıkarma fonksiyonu
 def extract_image(entry):
-    # media_content
     if hasattr(entry, 'media_content') and entry.media_content:
         return entry.media_content[0]['url']
-    # media_thumbnail
     elif hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
         return entry.media_thumbnail[0]['url']
-    # summary içindeki img tag
     else:
-        m = re.search(r'<img[^>]+src="([^"]+)"', getattr(entry, 'summary', ''))
-        if m:
-            return m.group(1)
+        imgs = re.findall(r'<img[^>]+src="([^"]+)"', getattr(entry, 'summary', ''))
+        if imgs:
+            return imgs[0]
     return None
 
 def send_news(entry):
@@ -121,5 +121,4 @@ while True:
         check_news()
     except Exception as e:
         print("Hata:", e)
-    time.sleep(180)  # her 3 dakikada bir kontrol
-
+    time.sleep(180)
