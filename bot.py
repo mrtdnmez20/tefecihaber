@@ -62,24 +62,15 @@ def save_links():
             f.write(l + "\n")
 
 # -----------------------------------
-# Google News yönlendirme linkini gerçek linke çevir
-# -----------------------------------
-def clean_google_news_link(link):
-    try:
-        r = requests.get(link, timeout=5, allow_redirects=True)
-        return r.url  # gerçek haber linki
-    except:
-        return link  # hata olursa orijinal kalsın
-
-# -----------------------------------
-# Telegram gönderim fonksiyonu
+# Telegram gönderim fonksiyonu (link başlığa gömülü)
 # -----------------------------------
 def send_news(entry):
     title = entry.title
-    link = clean_google_news_link(entry.link)
+    link = entry.link  # Google News linki
     summary = getattr(entry, "summary", "📝 Bu haber için özet bulunamadı.")
 
-    message_text = f"📢 {title}\n\n{summary}\n\n🔗 {link}"
+    # Linki başlığa gömerek gizle
+    message_text = f'📢 <a href="{link}">{title}</a>\n\n{summary}\n\n<i>Kaynak: Google News</i>'
 
     # Fotoğraf kontrol
     image_url = None
@@ -89,11 +80,11 @@ def send_news(entry):
 
     if image_url:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
-        data = {"chat_id": CHAT_ID, "photo": image_url, "caption": message_text}
+        data = {"chat_id": CHAT_ID, "photo": image_url, "caption": message_text, "parse_mode": "HTML"}
         requests.post(url, data=data)
     else:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        data = {"chat_id": CHAT_ID, "text": message_text}
+        data = {"chat_id": CHAT_ID, "text": message_text, "parse_mode": "HTML"}
         requests.post(url, data=data)
 
 # -----------------------------------
