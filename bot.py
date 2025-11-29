@@ -49,7 +49,6 @@ def save_links():
 
 # Link normalize etme (Google RSS -> site link)
 def normalize_link(link):
-    # Google News RSS linklerinden orijinal site linkini çek
     if "news.google.com/rss/articles/" in link:
         try:
             parsed = urllib.parse.urlparse(link)
@@ -62,18 +61,15 @@ def normalize_link(link):
 
 # Resim çıkarma
 def extract_image(entry):
-    # RSS media_content
     if hasattr(entry, 'media_content') and entry.media_content:
         return entry.media_content[0]['url']
-    # media_thumbnail
     elif hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
         return entry.media_thumbnail[0]['url']
-    # summary içindeki img tag
     else:
         m = re.search(r'<img[^>]+src="([^"]+)"', getattr(entry, 'summary', ''))
         if m:
             return m.group(1)
-    # Eğer yoksa siteyi çek ve og:image den al
+    # Og:image den dene
     try:
         url = normalize_link(entry.link)
         resp = requests.get(url, timeout=5)
@@ -92,18 +88,15 @@ def send_news(entry):
     summary = getattr(entry, 'summary', '')
     image_url = extract_image(entry)
 
-    # Telegram mesajı başlık linkli, HTML parse_mode
     message_text = f'📢 <a href="{link}">{title}</a>\n\n{summary}'
 
     try:
         if image_url:
-            # Resimli mesaj
             requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
                 data={"chat_id": CHAT_ID, "caption": message_text, "parse_mode": "HTML", "photo": image_url}
             )
         else:
-            # Sadece başlık + özet
             requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
                 data={"chat_id": CHAT_ID, "text": message_text, "parse_mode": "HTML"}
@@ -111,8 +104,39 @@ def send_news(entry):
     except Exception as e:
         print("Telegram gönderme hatası:", e)
 
+def fetch_google_search():
+    """Google Search ile haberleri çek (basit scraping)"""
+    headers = {"User-Agent": "Mozilla/5.0"}
+    for keyword in KEYWORDS:
+        query = urllib.parse.quote(keyword)
+        url = f"https://www.google.com/search?q={query}&tbm=nws"
+        try:
+            resp = requests.get(url, headers=headers, timeout=5)
+            if not resp.ok:
+                continue
+            soup = BeautifulSoup(resp.text, "html.parser")
+            results = soup.select("div.GI74Re a")
+            for a in results:
+                link = a.get("href")
+                if not link:
+                    continue
+                # Normalize link
+                if link in sent_links:
+                    continue
+                title = a.get_text()
+                entry = type("Entry", (object,), {})()  # sahte entry objesi
+                entry.link = link
+                entry.title = title
+                entry.summary = ""
+                send_news(entry)
+                sent_links.add(link)
+                save_links()
+        except Exception as e:
+            print("Google search hatası:", e)
+
 def check_news():
     global first_run
+    # RSS haberleri
     for RSS_URL in RSS_URLS:
         try:
             feed = feedparser.parse(RSS_URL)
@@ -139,6 +163,9 @@ def check_news():
                 save_links()
     first_run = False
 
+    # Google Search haberleri
+    fetch_google_search()
+
 print("Bot çalışıyor...")
 
 while True:
@@ -146,4 +173,4 @@ while True:
         check_news()
     except Exception as e:
         print("Hata:", e)
-    time.sleep(180)  # her 3 dakikada bir kontrol
+    time.sleep(180)
