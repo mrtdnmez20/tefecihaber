@@ -55,24 +55,33 @@ def clean_html(text):
 # Google News linklerini normalize et (yönlendirmeyi gerçek siteye çevir)
 def normalize_google_link(link):
     try:
-        parsed = requests.get(link, timeout=5, allow_redirects=True)
-        return parsed.url
+        resp = requests.get(link, timeout=5, allow_redirects=True)
+        return resp.url
     except:
         return link
 
-# Telegram gönderim
+# Telegram gönderim (butonlu)
 def send_news(entry):
     title = clean_html(entry.title)
     summary = clean_html(getattr(entry, "summary", ""))
     link = normalize_google_link(entry.link)
 
-    # Mesaj formatı
-    message_text = f"📢 {title}\n\n{summary}\n\n🔗 {link}"
+    message_text = f"📢 {title}\n\n{summary}"
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "Haber Linki", "url": link}]
+        ]
+    }
 
     try:
         requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-            data={"chat_id": CHAT_ID, "text": message_text}
+            data={
+                "chat_id": CHAT_ID,
+                "text": message_text,
+                "reply_markup": str(keyboard).replace("'", '"')
+            }
         )
     except Exception as e:
         print("Telegram gönderme hatası:", e)
@@ -118,4 +127,4 @@ while True:
         check_news()
     except Exception as e:
         print("Hata:", e)
-    time.sleep(180)
+    time.sleep(180)  # 3 dakikada bir kontrol
