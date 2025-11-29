@@ -131,6 +131,8 @@ def check_news():
     for RSS_URL in RSS_URLS:
         try:
             feed = feedparser.parse(RSS_URL)
+print(f"RSS kontrol: {RSS_URL} → {len(feed.entries)} haber bulundu")
+
         except Exception as e:
             print("RSS parse hatası:", e)
             continue
