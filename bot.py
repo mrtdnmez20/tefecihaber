@@ -136,7 +136,7 @@ def fetch_google_search():
 
 def check_news():
     global first_run
-    # RSS haberleri
+
     for RSS_URL in RSS_URLS:
         try:
             feed = feedparser.parse(RSS_URL)
@@ -155,13 +155,15 @@ def check_news():
                 if datetime.now(timezone.utc) - published_dt > timedelta(days=1):
                     continue
 
-            content = (entry.title + " " + getattr(entry, 'summary', '')).lower()
-            if any(k in content for k in KEYWORDS):
-                if not first_run:
-                    send_news(entry)
-                sent_links.add(link)
-                save_links()
+            # >> BURADAKİ ANA FİLTREYİ KALDIRIYORUZ <<
+            if not first_run:
+                send_news(entry)
+
+            sent_links.add(link)
+            save_links()
+
     first_run = False
+
 
     # Google Search haberleri
     fetch_google_search()
