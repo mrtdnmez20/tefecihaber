@@ -15,7 +15,6 @@ def fake_server():
             self.end_headers()
             self.wfile.write(b"Bot running")
 
-    # Render otomatik PORT verir, sadece dinlemesi yeterli
     server = HTTPServer(("", 10000), Handler)
     server.serve_forever()
 
@@ -31,12 +30,12 @@ import os
 from datetime import datetime, timezone, timedelta
 
 # -----------------------------------
-# TELEGRAM Bilgileri (Değiştirebilirsin)
+# TELEGRAM Bilgileri
 # -----------------------------------
 TELEGRAM_BOT_TOKEN = "8184765049:AAGS-X9Qa829_kV7hiWFistjN3G3QdJs1SY"
 CHAT_ID = 5250165372
 
-# Aranacak kelime listesi
+# Aranacak kelimeler
 KEYWORDS = ["tefeci", "tefecilik", "pos tefeciliği", "faizle para"]
 
 # -----------------------------------
@@ -44,11 +43,10 @@ KEYWORDS = ["tefeci", "tefecilik", "pos tefeciliği", "faizle para"]
 # -----------------------------------
 RSS_URLS = [
     "https://news.google.com/rss/search?q=tefeci+OR+tefecilik+when:1d&hl=tr&gl=TR&ceid=TR:tr",
-    # İstersen başka kaynak da eklenebilir; şu an hazır şekilde çalışıyor
 ]
 
 # -----------------------------------
-# Daha önce gönderilmiş linkler
+# Gönderilmiş linkleri saklama
 # -----------------------------------
 SENT_FILE = "sent_links.txt"
 
@@ -64,11 +62,21 @@ def save_links():
             f.write(l + "\n")
 
 # -----------------------------------
+# Google News yönlendirme linkini gerçek linke çevir
+# -----------------------------------
+def clean_google_news_link(link):
+    try:
+        r = requests.get(link, timeout=5, allow_redirects=True)
+        return r.url  # gerçek haber linki
+    except:
+        return link  # hata olursa orijinal kalsın
+
+# -----------------------------------
 # Telegram gönderim fonksiyonu
 # -----------------------------------
 def send_news(entry):
     title = entry.title
-    link = entry.link
+    link = clean_google_news_link(entry.link)
     summary = getattr(entry, "summary", "📝 Bu haber için özet bulunamadı.")
 
     message_text = f"📢 {title}\n\n{summary}\n\n🔗 {link}"
@@ -76,21 +84,14 @@ def send_news(entry):
     # Fotoğraf kontrol
     image_url = None
     media = getattr(entry, "media_content", None)
-    if media:
-        if isinstance(media, list) and len(media) > 0:
-            image_url = media[0].get("url")
+    if media and isinstance(media, list) and len(media) > 0:
+        image_url = media[0].get("url")
 
     if image_url:
-        # Foto varsa foto + caption gönder
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
-        data = {
-            "chat_id": CHAT_ID,
-            "photo": image_url,
-            "caption": message_text,
-        }
+        data = {"chat_id": CHAT_ID, "photo": image_url, "caption": message_text}
         requests.post(url, data=data)
     else:
-        # Foto yoksa normal metin
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         data = {"chat_id": CHAT_ID, "text": message_text}
         requests.post(url, data=data)
