@@ -5,8 +5,8 @@ import time
 import feedparser
 import os
 import re
+import json
 from datetime import datetime, timezone, timedelta
-from bs4 import BeautifulSoup
 
 # ------------------------------
 # Render için fake server
@@ -29,7 +29,7 @@ TELEGRAM_BOT_TOKEN = "8184765049:AAGS-X9Qa829_kV7hiWFistjN3G3QdJs1SY"
 CHAT_ID = 5250165372
 KEYWORDS = ["tefeci", "tefecilik", "pos tefeciliği", "faizle para"]
 
-# RSS kaynakları
+# RSS Kaynağı
 RSS_URLS = [
     "https://news.google.com/rss/search?q=tefeci+OR+tefecilik+when:1d&hl=tr&gl=TR&ceid=TR:tr",
 ]
@@ -52,15 +52,17 @@ def clean_html(text):
     clean = re.sub('<.*?>', '', text)
     return clean.strip()
 
-# Google News linklerini normalize et (yönlendirmeyi gerçek siteye çevir)
+# Google News linklerini normal site linkine dönüştür
 def normalize_google_link(link):
     try:
         resp = requests.get(link, timeout=5, allow_redirects=True)
-        return resp.url
+        if resp.ok:
+            return resp.url
+        return link
     except:
         return link
 
-# Telegram gönderim (butonlu)
+# Telegram gönderim
 def send_news(entry):
     title = clean_html(entry.title)
     summary = clean_html(getattr(entry, "summary", ""))
@@ -68,6 +70,7 @@ def send_news(entry):
 
     message_text = f"📢 {title}\n\n{summary}"
 
+    # Telegram JSON formatında olmak zorunda
     keyboard = {
         "inline_keyboard": [
             [{"text": "Haber Linki", "url": link}]
@@ -75,14 +78,16 @@ def send_news(entry):
     }
 
     try:
-        requests.post(
+        r = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-            data={
+            json={
                 "chat_id": CHAT_ID,
                 "text": message_text,
-                "reply_markup": str(keyboard).replace("'", '"')
+                "reply_markup": keyboard,
+                "disable_web_page_preview": False
             }
         )
+        print("Gönderildi:", r.text)
     except Exception as e:
         print("Telegram gönderme hatası:", e)
 
@@ -91,6 +96,7 @@ def check_news():
     for RSS_URL in RSS_URLS:
         feed = feedparser.parse(RSS_URL)
         for entry in feed.entries:
+
             link = entry.link
             if link in sent_links:
                 continue
@@ -98,8 +104,8 @@ def check_news():
             # Tarih kontrolü
             published = getattr(entry, "published_parsed", None)
             if published:
-                time_dt = datetime.fromtimestamp(time.mktime(published), tz=timezone.utc)
-                if datetime.now(timezone.utc) - time_dt > timedelta(days=1):
+                published_dt = datetime.fromtimestamp(time.mktime(published), tz=timezone.utc)
+                if datetime.now(timezone.utc) - published_dt > timedelta(days=1):
                     continue
 
             # Keyword filtre
@@ -115,7 +121,7 @@ def check_news():
 try:
     requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-        data={"chat_id": CHAT_ID, "text": "🟢 Bot başlatıldı! Haberler kontrol ediliyor..."}
+        json={"chat_id": CHAT_ID, "text": "🟢 Bot başlatıldı! Haberler kontrol ediliyor..."}
     )
 except:
     pass
@@ -127,4 +133,4 @@ while True:
         check_news()
     except Exception as e:
         print("Hata:", e)
-    time.sleep(180)  # 3 dakikada bir kontrol
+    time.sleep(180)
